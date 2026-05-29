@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hamsi AI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0b111e; color: #e3e3e3; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .chat-container { width: 100%; max-width: 800px; height: 90vh; background-color: #121b2d; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); border: 1px solid #1e2d4a; }
+        .chat-header { padding: 20px; background-color: #121b2d; border-bottom: 1px solid #1e2d4a; display: flex; align-items: center; gap: 12px; }
+        .chat-header h2 { font-size: 1.3rem; font-weight: 600; color: #4bacf7; }
+        .ai-status { width: 10px; height: 10px; background-color: #4af586; border-radius: 50%; box-shadow: 0 0 8px #4af586; }
+        .chat-messages { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+        .message { max-width: 75%; padding: 14px 18px; border-radius: 18px; font-size: 0.95rem; line-height: 1.5; word-wrap: break-word; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .user-message { background-color: #1e2d4a; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; border: 1px solid #2b3f66; }
+        .ai-message { background-color: #162238; color: #e3e3e3; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #233554; }
+        .chat-footer { background-color: #121b2d; border-top: 1px solid #1e2d4a; display: flex; flex-direction: column; align-items: center; padding: 15px 20px 10px 20px; }
+        .chat-input-area { width: 100%; display: flex; gap: 12px; margin-bottom: 8px; }
+        .input-wrapper { flex: 1; position: relative; display: flex; align-items: center; }
+        input[type="text"] { width: 100%; padding: 14px 20px; background-color: #0b111e; border: 1px solid #233554; border-radius: 28px; color: #fff; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+        input[type="text"]:focus { border-color: #4bacf7; }
+        button { background-color: #4bacf7; color: #0b111e; border: none; padding: 0 24px; border-radius: 28px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+        button:hover { background-color: #7cd3ff; }
+        button:active { transform: scale(0.98); }
+        .disclaimer { font-size: 0.75rem; color: #627597; text-align: center; }
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-thumb { background-color: #1e2d4a; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="ai-status"></div>
+        <h2>Hamsi AI Asistan 🐟</h2>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+        <div class="message ai-message">Selam! Ben Hamsi AI. Bugün senin için ne yapabilirim?</div>
+    </div>
+
+    <div class="chat-footer">
+        <div class="chat-input-area">
+            <div class="input-wrapper">
+                <input type="text" id="soruInput" placeholder="Hamsi AI'a bir mesaj gönderin..." autocomplete="off">
+            </div>
+            <button id="gonderButon">Gönder</button>
+        </div>
+        <div class="disclaimer">Bu bir yapay zekadır. Hata yapabilir.</div>
+    </div>
+</div>
+
+<script>
+  const chatMessages = document.getElementById("chatMessages");
+  const soruInput = document.getElementById("soruInput");
+  const gonderButon = document.getElementById("gonderButon");
+
+  async function mesajGonder() {
+      const soru = soruInput.value.trim();
+      if (!soru) return;
+
+      ekranaMesajEkle(soru, "user-message");
+      soruInput.value = "";
+
+      const loadingMessage = ekranaMesajEkle("Hamsi AI düşünüyor...", "ai-message");
+      
+      try {
+          // Kodda API anahtarı yok, Vercel üzerindeki gizli sunucuya istek atıyor
+          const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: soru })
+          });
+          
+          const data = await response.json();
+          
+          if(response.ok) {
+              loadingMessage.innerText = data.text;
+          } else {
+              loadingMessage.innerText = "Hata: " + data.error;
+          }
+      } catch (error) {
+          console.error(error);
+          loadingMessage.innerText = "Bağlantı hatası oluştu.";
+      }
+      
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function ekranaMesajEkle(metin, sınıfAdı) {
+      const mesajDiv = document.createElement("div");
+      mesajDiv.className = `message ${sınıfAdı}`;
+      mesajDiv.innerText = metin;
+      chatMessages.appendChild(mesajDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return mesajDiv;
+  }
+
+  gonderButon.addEventListener("click", mesajGonder);
+  soruInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") { mesajGonder(); }
+  });
+</script>
+
+</body>
+</html>
