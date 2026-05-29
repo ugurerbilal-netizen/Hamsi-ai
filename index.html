@@ -109,7 +109,7 @@
           if (micButon.classList.contains("recording")) {
               recognition.stop();
           } else {
-              if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // Konuşuyorsa sustur
+              if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
               recognition.start();
           }
       });
@@ -145,30 +145,32 @@
       previewContainer.style.display = "none";
   });
 
-  // --- DAHA İYİ SESLİ OKUMA FONKSİYONU ---
+  // --- 2. ÇÖZÜM: YUMUŞATILMIŞ SESLİ OKUMA FONKSİYONU ---
   function seslendir(metin) {
       if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel(); // Önceki sesleri kes
           
           const utterance = new SpeechSynthesisUtterance(metin);
           utterance.lang = 'tr-TR';
-          utterance.rate = 1.0; // Konuşma hızı (Yavaşlatmak istersen 0.9 yapabilirsin)
           
-          // Sistemdeki tüm sesleri kontrol et ve en iyi Türkçe sesi seç
+          // Robotik sesi yumuşatmak için ince tonlama ayarları
+          utterance.rate = 0.95;  // Konuşma hızını hafifçe yavaşlatarak insanileştirir
+          utterance.pitch = 1.05; // Ses tonunu hafifçe incelterek mekanikliği azaltır
+          
           const sesler = window.speechSynthesis.getVoices();
+          // Varsa Google veya Microsoft'un daha kaliteli ses alt yapılarını seçmeye çalışır
           const enIyiSes = sesler.find(s => s.lang.includes('tr') && (s.name.includes('Google') || s.name.includes('Microsoft') || s.name.includes('Natural')));
           
           if (enIyiSes) {
               utterance.voice = enIyiSes;
           } else {
-              utterance.voice = sesler.find(s => s.lang.includes('tr')); // Bulamazsa normal Türkçe ses
+              utterance.voice = sesler.find(s => s.lang.includes('tr'));
           }
           
           window.speechSynthesis.speak(utterance);
       }
   }
 
-  // Tarayıcı arka planda sesleri yüklerken listeyi hazır tutsun diye eklenen tetikleyici
   if ('speechSynthesis' in window) {
       window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
   }
@@ -178,7 +180,7 @@
       const soru = soruInput.value.trim();
       if (!soru && !base64Image) return;
 
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // Yeni mesajda sustur
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
 
       let userDiv = ekranaMesajEkle(soru, "user-message");
       if (base64Image) {
@@ -213,7 +215,7 @@
           
           if(response.ok) {
               loadingMessage.innerText = data.text;
-              seslendir(data.text); // Yapay zeka yanıtını seslendir
+              seslendir(data.text); // Yeni ses ayarlarıyla çalıştırılıyor
           } else {
               loadingMessage.innerText = "Hata: " + data.error;
           }
