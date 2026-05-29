@@ -97,6 +97,7 @@
   const removeImgButon = document.getElementById("removeImgButon");
 
   let base64Image = null;
+  let sesliCevapVer = false; // Ses durumunu kontrol etmek için yeni değişken
 
   // --- MİKROFON (SESI YAZIYA ÇEVİRME) ---
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -110,6 +111,7 @@
               recognition.stop();
           } else {
               if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
+              sesliCevapVer = true; // Mikrofon tıklandıysa yapay zeka sesli yanıt verecek
               recognition.start();
           }
       });
@@ -119,6 +121,9 @@
       recognition.onresult = (e) => {
           const spokenText = e.results[0][0].transcript;
           soruInput.value = spokenText;
+          
+          // OTO GÖNDERME: Mikrofon metni algıladığı an mesajGonder() fonksiyonunu tetikliyoruz
+          mesajGonder();
       };
   } else {
       micButon.style.display = "none";
@@ -145,20 +150,18 @@
       previewContainer.style.display = "none";
   });
 
-  // --- 2. ÇÖZÜM: YUMUŞATILMIŞ SESLİ OKUMA FONKSİYONU ---
+  // --- YUMUŞATILMIŞ SESLİ OKUMA FONKSİYONU ---
   function seslendir(metin) {
       if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel(); // Önceki sesleri kes
+          window.speechSynthesis.cancel(); 
           
           const utterance = new SpeechSynthesisUtterance(metin);
           utterance.lang = 'tr-TR';
           
-          // Robotik sesi yumuşatmak için ince tonlama ayarları
-          utterance.rate = 0.95;  // Konuşma hızını hafifçe yavaşlatarak insanileştirir
-          utterance.pitch = 1.05; // Ses tonunu hafifçe incelterek mekanikliği azaltır
+          utterance.rate = 0.95;  
+          utterance.pitch = 1.05; 
           
           const sesler = window.speechSynthesis.getVoices();
-          // Varsa Google veya Microsoft'un daha kaliteli ses alt yapılarını seçmeye çalışır
           const enIyiSes = sesler.find(s => s.lang.includes('tr') && (s.name.includes('Google') || s.name.includes('Microsoft') || s.name.includes('Natural')));
           
           if (enIyiSes) {
@@ -215,7 +218,11 @@
           
           if(response.ok) {
               loadingMessage.innerText = data.text;
-              seslendir(data.text); // Yeni ses ayarlarıyla çalıştırılıyor
+              
+              // Eğer mikrofondan gelindiyse seslendir, klavyeyle yazıldıysa sessiz kal
+              if (sesliCevapVer) {
+                  seslendir(data.text);
+              }
           } else {
               loadingMessage.innerText = "Hata: " + data.error;
           }
@@ -223,8 +230,23 @@
           loadingMessage.innerText = "Bağlantı hatası oluştu.";
       }
       
+      // Her istek bittiğinde ses modunu klavye (sessiz) moduna geri sıfırla
+      sesliCevapVer = false;
       chatMessages.scrollTop = chatMessages.scrollHeight;
   }
+
+  // Gönder butonu veya Enter tuşuna basıldığında sesliCevapVer'i false yapıyoruz (Sessiz mod)
+  gonderButon.addEventListener("click", () => {
+      sesliCevapVer = false;
+      mesajGonder();
+  });
+  
+  soruInput.addEventListener("keypress", (e) => { 
+      if (e.key === "Enter") { 
+          sesliCevapVer = false;
+          mesajGonder(); 
+      } 
+  });
 
   function ekranaMesajEkle(metin, sınıfAdı) {
       const mesajDiv = document.createElement("div");
@@ -234,9 +256,6 @@
       chatMessages.scrollTop = chatMessages.scrollHeight;
       return mesajDiv;
   }
-
-  gonderButon.addEventListener("click", mesajGonder);
-  soruInput.addEventListener("keypress", (e) => { if (e.key === "Enter") { mesajGonder(); } });
 </script>
 
 </body>
