@@ -4,14 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hamsi AI - Gelişmiş Asistan</title>
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script>
+        // KİLİT SİSTEMİ: Kullanıcı ilk sayfayı atlayıp direkt buraya girmeye çalışırsa index.html'e geri şutla!
+        if (localStorage.getItem("hamsi_verified") !== "true") {
+            window.location.href = "/index.html";
+        }
+    </script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #0b111e; color: #e3e3e3; display: flex; justify-content: center; align-items: center; height: 100vh; }
         .chat-container { width: 100%; max-width: 800px; height: 90vh; background-color: #121b2d; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); border: 1px solid #1e2d4a; }
-        .chat-header { padding: 20px; background-color: #121b2d; border-bottom: 1px solid #1e2d4a; display: flex; align-items: center; gap: 12px; }
+        .chat-header { padding: 20px; background-color: #121b2d; border-bottom: 1px solid #1e2d4a; display: flex; align-items: center; justify-content: space-between; }
+        .chat-header-left { display: flex; align-items: center; gap: 12px; }
         .chat-header h2 { font-size: 1.3rem; font-weight: 600; color: #4bacf7; }
         .ai-status { width: 10px; height: 10px; background-color: #4af586; border-radius: 50%; box-shadow: 0 0 8px #4af586; }
+        .cikis-btn { background: none; border: 1px solid #ff4a4a; color: #ff4a4a; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .cikis-btn:hover { background: #ff4a4a; color: #fff; }
         .chat-messages { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
         .message { max-width: 75%; padding: 14px 18px; border-radius: 18px; font-size: 0.95rem; line-height: 1.5; word-wrap: break-word; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -45,11 +53,8 @@
         #gonderButon { background-color: #4bacf7; color: #0b111e; border: none; padding: 0 24px; border-radius: 28px; font-weight: 600; cursor: pointer; }
         #gonderButon:hover { background-color: #7cd3ff; }
         
-        /* ReCAPTCHA Alanı */
-        .captcha-wrapper { margin-top: 10px; display: flex; justify-content: center; width: 100%; }
-
         .uploaded-img { max-width: 200px; border-radius: 8px; margin-top: 8px; display: block; }
-        .disclaimer { font-size: 0.75rem; color: #627597; text-align: center; margin-top: 5px; }
+        .disclaimer { font-size: 0.75rem; color: #627597; text-align: center; }
         .chat-messages::-webkit-scrollbar { width: 6px; }
         .chat-messages::-webkit-scrollbar-thumb { background-color: #1e2d4a; border-radius: 4px; }
     </style>
@@ -58,12 +63,15 @@
 
 <div class="chat-container">
     <div class="chat-header">
-        <div class="ai-status"></div>
-        <h2>Hamsi AI Asistan 🐟</h2>
+        <div class="chat-header-left">
+            <div class="ai-status"></div>
+            <h2>Hamsi AI Asistan 🐟</h2>
+        </div>
+        <button class="cikis-btn" id="cikisButon">Güvenli Çıkış</button>
     </div>
 
     <div class="chat-messages" id="chatMessages">
-        <div class="message ai-message">Selam! Ben Gelişmiş Hamsi AI. Sesli konuşabilir, resim analiz edebilirim. Bugün ne yapacağız?</div>
+        <div class="message ai-message">Robot doğrulaması başarılı! Ben Hamsi AI. Sesli konuşabilir veya resim analiz edebilirim. Sorun nedir?</div>
     </div>
 
     <div class="preview-container" id="previewContainer">
@@ -82,11 +90,6 @@
             </div>
             <button id="gonderButon">Gönder</button>
         </div>
-
-        <div class="captcha-wrapper">
-            <div class="g-recaptcha" data-theme="dark" data-sitekey="6LfKzQItAAAAAAI9baq5tU3MHymhJgylS7vqSR82"></div>
-        </div>
-
         <div class="disclaimer">Hamsi AI hata yapabilir. Görselleri ve sesleri işleyebilir.</div>
     </div>
 </div>
@@ -101,11 +104,18 @@
   const previewContainer = document.getElementById("previewContainer");
   const previewImage = document.getElementById("previewImage");
   const removeImgButon = document.getElementById("removeImgButon");
+  const cikisButon = document.getElementById("cikisButon");
 
   let base64Image = null;
   let sesliCevapVer = false; 
 
-  // --- MİKROFON VE OTO GÖNDERME ---
+  // Güvenli Çıkış Butonu
+  cikisButon.addEventListener("click", () => {
+      localStorage.removeItem("hamsi_verified"); 
+      window.location.href = "/index.html"; 
+  });
+
+  // --- MİKROFON VE OTOMATİK GÖNDERME ---
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -128,13 +138,14 @@
       recognition.onresult = (e) => {
           const spokenText = e.results[0][0].transcript;
           soruInput.value = spokenText;
+          // Mikrofon kapandıktan 400ms sonra otomatik gönderir
           setTimeout(() => { mesajGonder(); }, 400);
       };
   } else {
       micButon.style.display = "none";
   }
 
-  // --- RESİM YÜKLEME ---
+  // --- GÖRSEL İŞLEMLERİ ---
   fileButon.addEventListener("click", () => hiddenFileInput.click());
   hiddenFileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
@@ -154,7 +165,7 @@
       previewContainer.style.display = "none";
   });
 
-  // --- SES LİSTESİ ---
+  // --- GELİŞMİŞ TÜRKÇE SES SİSTEMİ ---
   let sistemSesleri = [];
   function sesleriYukle() {
       if ('speechSynthesis' in window) sistemSesleri = window.speechSynthesis.getVoices();
@@ -167,25 +178,18 @@
           window.speechSynthesis.cancel(); 
           const utterance = new SpeechSynthesisUtterance(metin);
           utterance.lang = 'tr-TR';
-          utterance.rate = 0.95;  
-          utterance.pitch = 1.05; 
+          utterance.rate = 0.95;  // İnsansı yumuşatma hızı
+          utterance.pitch = 1.05; // Ton yumuşatma
           const enIyiSes = sistemSesleri.find(s => s.lang.includes('tr') && (s.name.includes('Google') || s.name.includes('Microsoft') || s.name.includes('Natural')));
           utterance.voice = enIyiSes ? enIyiSes : sistemSesleri.find(s => s.lang.includes('tr'));
           window.speechSynthesis.speak(utterance);
       }
   }
 
-  // --- MESAJ GÖNDERME (RECAPTCHA TOKENLI) ---
+  // --- MESAJ GÖNDERME ---
   async function mesajGonder() {
       const soru = soruInput.value.trim();
       if (!soru && !base64Image) return;
-
-      // Google reCAPTCHA doğrulama kodunu alıyoruz
-      const captchaToken = grecaptcha.getResponse();
-      if (!captchaToken) {
-          alert("Lütfen önce robot doğrulamasını (reCAPTCHA) kutucuğuna tıklayarak tamamlayın!");
-          return;
-      }
 
       if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
 
@@ -214,28 +218,24 @@
       chatMessages.scrollTop = chatMessages.scrollHeight;
       
       try {
+          // Doğrudan kendi yapay zeka endpoint'inize istek atar
           const response = await fetch('/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              // Gelişmişlik: Tokenı backend'e gönderiyoruz
-              body: JSON.stringify({ message: currentSoru, image: currentImg, captchaToken: captchaToken })
+              body: JSON.stringify({ message: currentSoru, image: currentImg })
           });
           
           const data = await response.json();
           
           if(response.ok) {
               loadingMessage.innerText = data.text;
+              // Mikrofondan gelindiyse seslendirir, klavyeden girildiyse sessiz kalır
               if (oAnkiSesModu === true) seslendir(data.text);
-              
-              // Her başarılı mesajdan sonra reCAPTCHA'yı sıfırla (Güvenlik için her mesajda yeni tik gerekir)
-              grecaptcha.reset();
           } else {
               loadingMessage.innerText = "Hata: " + data.error;
-              grecaptcha.reset();
           }
       } catch (error) {
           loadingMessage.innerText = "Bağlantı hatası oluştu.";
-          grecaptcha.reset();
       }
       
       chatMessages.scrollTop = chatMessages.scrollHeight;
