@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hamsi AI</title>
+    <title>Hamsi AI - Gelişmiş Asistan</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #0b111e; color: #e3e3e3; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -16,14 +16,38 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .user-message { background-color: #1e2d4a; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; border: 1px solid #2b3f66; }
         .ai-message { background-color: #162238; color: #e3e3e3; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #233554; }
+        
+        /* 3 Nokta Yanıp Sönme Animasyonu */
+        .typing-dots { display: flex; gap: 5px; align-items: center; height: 20px; }
+        .typing-dots span { width: 8px; height: 8px; background-color: #4bacf7; border-radius: 50%; animation: blink 1.4s infinite both; }
+        .typing-dots span:nth-child(2) { animation-delay: .2s; }
+        .typing-dots span:nth-child(3) { animation-delay: .4s; }
+        @keyframes blink { 0% { opacity: .2; } 20% { opacity: 1; } 100% { opacity: .2; } }
+
+        /* Önizleme Resmi Alanı */
+        .preview-container { display: none; width: 100%; padding: 10px 20px; background: #162238; border-top: 1px solid #1e2d4a; align-items: center; gap: 10px; }
+        .preview-image { max-height: 60px; border-radius: 8px; border: 1px solid #4bacf7; }
+        .remove-btn { background: #ff4a4a !important; color: white !important; padding: 5px 10px !important; font-size: 0.8rem; border-radius: 4px; }
+
         .chat-footer { background-color: #121b2d; border-top: 1px solid #1e2d4a; display: flex; flex-direction: column; align-items: center; padding: 15px 20px 10px 20px; }
         .chat-input-area { width: 100%; display: flex; gap: 12px; margin-bottom: 8px; }
         .input-wrapper { flex: 1; position: relative; display: flex; align-items: center; }
-        input[type="text"] { width: 100%; padding: 14px 20px; background-color: #0b111e; border: 1px solid #233554; border-radius: 28px; color: #fff; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+        
+        input[type="text"] { width: 100%; padding: 14px 50px 14px 20px; background-color: #0b111e; border: 1px solid #233554; border-radius: 28px; color: #fff; font-size: 1rem; outline: none; }
         input[type="text"]:focus { border-color: #4bacf7; }
-        button { background-color: #4bacf7; color: #0b111e; border: none; padding: 0 24px; border-radius: 28px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
-        button:hover { background-color: #7cd3ff; }
-        button:active { transform: scale(0.98); }
+
+        /* Yuvarlak İkon Butonları */
+        .icon-btn { position: absolute; background: none; border: none; padding: 0; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; transition: background 0.2s; }
+        .icon-btn:hover { background-color: #1e2d4a; }
+        #micButon { right: 10px; color: #4bacf7; }
+        #micButon.recording { color: #ff4a4a; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        #fileButon { background-color: #233554; color: #fff; padding: 0 15px; border-radius: 28px; }
+        #gonderButon { background-color: #4bacf7; color: #0b111e; border: none; padding: 0 24px; border-radius: 28px; font-weight: 600; cursor: pointer; }
+        #gonderButon:hover { background-color: #7cd3ff; }
+        
+        .uploaded-img { max-width: 200px; border-radius: 8px; margin-top: 8px; display: block; }
         .disclaimer { font-size: 0.75rem; color: #627597; text-align: center; }
         .chat-messages::-webkit-scrollbar { width: 6px; }
         .chat-messages::-webkit-scrollbar-thumb { background-color: #1e2d4a; border-radius: 4px; }
@@ -38,71 +62,28 @@
     </div>
 
     <div class="chat-messages" id="chatMessages">
-        <div class="message ai-message">Selam! Ben Hamsi AI. Bugün senin için ne yapabilirim?</div>
+        <div class="message ai-message">Selam! Ben Gelişmiş Hamsi AI. Sesli konuşabilir, resim analiz edebilirim. Bugün ne yapacağız?</div>
+    </div>
+
+    <div class="preview-container" id="previewContainer">
+        <img class="preview-image" id="previewImage" src="" alt="Önizleme">
+        <button class="remove-btn" id="removeImgButon">Kaldır</button>
     </div>
 
     <div class="chat-footer">
         <div class="chat-input-area">
+            <button id="fileButon">📷 Resim</button>
+            <input type="file" id="hiddenFileInput" accept="image/*" style="display: none;">
+            
             <div class="input-wrapper">
-                <input type="text" id="soruInput" placeholder="Hamsi AI'a bir mesaj gönderin..." autocomplete="off">
+                <input type="text" id="soruInput" placeholder="Hamsi AI'a bir mesaj gönderin veya konuşun..." autocomplete="off">
+                <button class="icon-btn" id="micButon" title="Sesle Konuş">🎤</button>
             </div>
             <button id="gonderButon">Gönder</button>
         </div>
-        <div class="disclaimer">Bu bir yapay zekadır. Hata yapabilir.</div>
+        <div class="disclaimer">Hamsi AI hata yapabilir. Görselleri ve sesleri işleyebilir.</div>
     </div>
 </div>
 
 <script>
   const chatMessages = document.getElementById("chatMessages");
-  const soruInput = document.getElementById("soruInput");
-  const gonderButon = document.getElementById("gonderButon");
-
-  async function mesajGonder() {
-      const soru = soruInput.value.trim();
-      if (!soru) return;
-
-      ekranaMesajEkle(soru, "user-message");
-      soruInput.value = "";
-
-      const loadingMessage = ekranaMesajEkle("Hamsi AI düşünüyor...", "ai-message");
-      
-      try {
-          // Kodda API anahtarı yok, Vercel üzerindeki gizli sunucuya istek atıyor
-          const response = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message: soru })
-          });
-          
-          const data = await response.json();
-          
-          if(response.ok) {
-              loadingMessage.innerText = data.text;
-          } else {
-              loadingMessage.innerText = "Hata: " + data.error;
-          }
-      } catch (error) {
-          console.error(error);
-          loadingMessage.innerText = "Bağlantı hatası oluştu.";
-      }
-      
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
-  function ekranaMesajEkle(metin, sınıfAdı) {
-      const mesajDiv = document.createElement("div");
-      mesajDiv.className = `message ${sınıfAdı}`;
-      mesajDiv.innerText = metin;
-      chatMessages.appendChild(mesajDiv);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-      return mesajDiv;
-  }
-
-  gonderButon.addEventListener("click", mesajGonder);
-  soruInput.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") { mesajGonder(); }
-  });
-</script>
-
-</body>
-</html>
