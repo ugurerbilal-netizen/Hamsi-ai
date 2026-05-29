@@ -87,3 +87,126 @@
 
 <script>
   const chatMessages = document.getElementById("chatMessages");
+  const soruInput = document.getElementById("soruInput");
+  const gonderButon = document.getElementById("gonderButon");
+  const micButon = document.getElementById("micButon");
+  const fileButon = document.getElementById("fileButon");
+  const hiddenFileInput = document.getElementById("hiddenFileInput");
+  const previewContainer = document.getElementById("previewContainer");
+  const previewImage = document.getElementById("previewImage");
+  const removeImgButon = document.getElementById("removeImgButon");
+
+  let base64Image = null;
+
+  // --- MİKROFON (SESİ YAZIYA ÇEVİRME) ---
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'tr-TR';
+      recognition.interimResults = false;
+
+      micButon.addEventListener("click", () => {
+          if (micButon.classList.contains("recording")) {
+              recognition.stop();
+          } else {
+              recognition.start();
+          }
+      });
+
+      recognition.onstart = () => { micButon.classList.add("recording"); soruInput.placeholder = "Dinleniyor..."; };
+      recognition.onend = () => { micButon.classList.remove("recording"); soruInput.placeholder = "Hamsi AI'a bir mesaj gönderin veya konuşun..."; };
+      recognition.onresult = (e) => {
+          const spokenText = e.results[0][0].transcript;
+          soruInput.value = spokenText;
+      };
+  } else {
+      micButon.style.display = "none"; // Tarayıcı desteklemiyorsa gizle
+  }
+
+  // --- RESİM YÜKLEME İŞLEMLERİ ---
+  fileButon.addEventListener("click", () => hiddenFileInput.click());
+  hiddenFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          base64Image = event.target.result; // Vercel'e göndermek için base64'e çevirdik
+          previewImage.src = base64Image;
+          previewContainer.style.display = "flex";
+      };
+      reader.readAsDataURL(file);
+  });
+
+  removeImgButon.addEventListener("click", () => {
+      base64Image = null;
+      hiddenFileInput.value = "";
+      previewContainer.style.display = "none";
+  });
+
+  // --- MESAJ GÖNDERME VE YANIP SÖNEN ÜÇ NOKTA ---
+  async function mesajGonder() {
+      const soru = soruInput.value.trim();
+      if (!soru && !base64Image) return;
+
+      // Kullanıcının mesajını ekrana bas (Varsa resmi de ekle)
+      let userDiv = ekranaMesajEkle(soru, "user-message");
+      if (base64Image) {
+          const imgEl = document.createElement("img");
+          imgEl.src = base64Image;
+          imgEl.className = "uploaded-img";
+          userDiv.appendChild(imgEl);
+      }
+
+      const currentSoru = soru;
+      const currentImg = base64Image;
+
+      // Inputları sıfırla ve önizlemeyi kapat
+      soruInput.value = "";
+      base64Image = null;
+      previewContainer.style.display = "none";
+      hiddenFileInput.value = "";
+
+      // DÜŞÜNÜYOR... Yanıp sönen 3 nokta efekti oluşturma
+      const loadingMessage = document.createElement("div");
+      loadingMessage.className = "message ai-message";
+      loadingMessage.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>`;
+      chatMessages.appendChild(loadingMessage);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      
+      try {
+          const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: currentSoru, image: currentImg })
+          });
+          
+          const data = await response.json();
+          
+          if(response.ok) {
+              loadingMessage.innerText = data.text;
+          } else {
+              loadingMessage.innerText = "Hata: " + data.error;
+          }
+      } catch (error) {
+          loadingMessage.innerText = "Bağlantı hatası oluştu.";
+      }
+      
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function ekranaMesajEkle(metin, sınıfAdı) {
+      const mesajDiv = document.createElement("div");
+      mesajDiv.className = `message ${sınıfAdı}`;
+      mesajDiv.innerText = metin;
+      chatMessages.appendChild(mesajDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return mesajDiv;
+  }
+
+  gonderButon.addEventListener("click", mesajGonder);
+  soruInput.addEventListener("keypress", (e) => { if (e.key === "Enter") { mesajGonder(); } });
+</script>
+
+</body>
+</html>
