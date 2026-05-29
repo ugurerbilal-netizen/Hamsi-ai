@@ -109,10 +109,7 @@
           if (micButon.classList.contains("recording")) {
               recognition.stop();
           } else {
-              // Yeni bir şey dinlemeden önce asistanın eski konuşması varsa susturuyoruz
-              if ('speechSynthesis' in window) {
-                  window.speechSynthesis.cancel();
-              }
+              if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // Konuşuyorsa sustur
               recognition.start();
           }
       });
@@ -122,8 +119,6 @@
       recognition.onresult = (e) => {
           const spokenText = e.results[0][0].transcript;
           soruInput.value = spokenText;
-          // İsteğe bağlı: Mikrofondan ses geldikten sonra otomatik göndermek istersen alt satırı aktifleştirebilirsin:
-          // mesajGonder();
       };
   } else {
       micButon.style.display = "none";
@@ -150,20 +145,32 @@
       previewContainer.style.display = "none";
   });
 
-  // --- SESLİ OKUMA (TEXT TO SPEECH) FONKSİYONU ---
+  // --- DAHA İYİ SESLİ OKUMA FONKSİYONU ---
   function seslendir(metin) {
       if ('speechSynthesis' in window) {
-          // Devam eden eski bir okuma varsa kes
-          window.speechSynthesis.cancel();
+          window.speechSynthesis.cancel(); // Önceki sesleri kes
           
           const utterance = new SpeechSynthesisUtterance(metin);
-          utterance.lang = 'tr-TR'; // Türkçe seslendirme
-          utterance.rate = 1.0;     // Normal konuşma hızı
+          utterance.lang = 'tr-TR';
+          utterance.rate = 1.0; // Konuşma hızı (Yavaşlatmak istersen 0.9 yapabilirsin)
+          
+          // Sistemdeki tüm sesleri kontrol et ve en iyi Türkçe sesi seç
+          const sesler = window.speechSynthesis.getVoices();
+          const enIyiSes = sesler.find(s => s.lang.includes('tr') && (s.name.includes('Google') || s.name.includes('Microsoft') || s.name.includes('Natural')));
+          
+          if (enIyiSes) {
+              utterance.voice = enIyiSes;
+          } else {
+              utterance.voice = sesler.find(s => s.lang.includes('tr')); // Bulamazsa normal Türkçe ses
+          }
           
           window.speechSynthesis.speak(utterance);
-      } else {
-          console.error("Tarayıcınız sesli okumayı (TTS) desteklemiyor.");
       }
+  }
+
+  // Tarayıcı arka planda sesleri yüklerken listeyi hazır tutsun diye eklenen tetikleyici
+  if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
   }
 
   // --- MESAJ GÖNDERME VE YANIP SÖNEN ÜÇ NOKTA ---
@@ -171,12 +178,8 @@
       const soru = soruInput.value.trim();
       if (!soru && !base64Image) return;
 
-      // Kullanıcı yeni mesaj attığında eğer asistan o sırada konuşuyorsa sustur
-      if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-      }
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // Yeni mesajda sustur
 
-      // Kullanıcının mesajını ekrana bas (Varsa resmi de ekle)
       let userDiv = ekranaMesajEkle(soru, "user-message");
       if (base64Image) {
           const imgEl = document.createElement("img");
@@ -188,13 +191,11 @@
       const currentSoru = soru;
       const currentImg = base64Image;
 
-      // Inputları sıfırla ve önizlemeyi kapat
       soruInput.value = "";
       base64Image = null;
       previewContainer.style.display = "none";
       hiddenFileInput.value = "";
 
-      // DÜŞÜNÜYOR... Yanıp sönen 3 nokta efekti oluşturma
       const loadingMessage = document.createElement("div");
       loadingMessage.className = "message ai-message";
       loadingMessage.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>`;
@@ -212,7 +213,7 @@
           
           if(response.ok) {
               loadingMessage.innerText = data.text;
-              seslendir(data.text); // Yapay zekadan gelen yanıtı seslendiriyoruz!
+              seslendir(data.text); // Yapay zeka yanıtını seslendir
           } else {
               loadingMessage.innerText = "Hata: " + data.error;
           }
