@@ -97,9 +97,9 @@
   const removeImgButon = document.getElementById("removeImgButon");
 
   let base64Image = null;
-  let sesliCevapVer = false; // Ses durumunu kontrol etmek için yeni değişken
+  let sesliCevapVer = false; 
 
-  // --- MİKROFON (SESI YAZIYA ÇEVİRME) ---
+  // --- MİKROFON AYARLARI VE OTOMATİK GÖNDERME ---
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -111,19 +111,22 @@
               recognition.stop();
           } else {
               if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
-              sesliCevapVer = true; // Mikrofon tıklandıysa yapay zeka sesli yanıt verecek
+              sesliCevapVer = true; // Mikrofon açıldığı için sesli cevap modu aktif
               recognition.start();
           }
       });
 
       recognition.onstart = () => { micButon.classList.add("recording"); soruInput.placeholder = "Dinleniyor..."; };
       recognition.onend = () => { micButon.classList.remove("recording"); soruInput.placeholder = "Hamsi AI'a bir mesaj gönderin veya konuşun..."; };
+      
       recognition.onresult = (e) => {
           const spokenText = e.results[0][0].transcript;
           soruInput.value = spokenText;
           
-          // OTO GÖNDERME: Mikrofon metni algıladığı an mesajGonder() fonksiyonunu tetikliyoruz
-          mesajGonder();
+          // Mikrofonun tamamen kapanması ve tarayıcının rahatlaması için 400ms güvenli bir gecikmeyle gönderiyoruz
+          setTimeout(() => {
+              mesajGonder();
+          }, 400);
       };
   } else {
       micButon.style.display = "none";
@@ -150,7 +153,19 @@
       previewContainer.style.display = "none";
   });
 
-  // --- YUMUŞATILMIŞ SESLİ OKUMA FONKSİYONU ---
+  // --- ARKA PLANDA SES LİSTESİNİ DOLDURMA (GÜVENLİK ÖNLEMİ) ---
+  let sistemSesleri = [];
+  function sesleriYukle() {
+      if ('speechSynthesis' in window) {
+          sistemSesleri = window.speechSynthesis.getVoices();
+      }
+  }
+  sesleriYukle();
+  if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = sesleriYukle;
+  }
+
+  // --- GELİŞTİRİLMİŞ SESLİ OKUMA FONKSİYONU ---
   function seslendir(metin) {
       if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel(); 
@@ -158,27 +173,24 @@
           const utterance = new SpeechSynthesisUtterance(metin);
           utterance.lang = 'tr-TR';
           
+          // Robotik sesi kırmak için hız ve ton optimizasyonu
           utterance.rate = 0.95;  
           utterance.pitch = 1.05; 
           
-          const sesler = window.speechSynthesis.getVoices();
-          const enIyiSes = sesler.find(s => s.lang.includes('tr') && (s.name.includes('Google') || s.name.includes('Microsoft') || s.name.includes('Natural')));
+          // Önbelleğe aldığımız ses listesinden en iyi Türkçe paketi buluyoruz
+          const enIyiSes = sistemSesleri.find(s => s.lang.includes('tr') && (s.name.includes('Google') || s.name.includes('Microsoft') || s.name.includes('Natural')));
           
           if (enIyiSes) {
               utterance.voice = enIyiSes;
           } else {
-              utterance.voice = sesler.find(s => s.lang.includes('tr'));
+              utterance.voice = sistemSesleri.find(s => s.lang.includes('tr'));
           }
           
           window.speechSynthesis.speak(utterance);
       }
   }
 
-  if ('speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
-  }
-
-  // --- MESAJ GÖNDERME VE YANIP SÖNEN ÜÇ NOKTA ---
+  // --- MESAJ GÖNDERME VE AKILLI SES KONTROLÜ ---
   async function mesajGonder() {
       const soru = soruInput.value.trim();
       if (!soru && !base64Image) return;
@@ -195,11 +207,13 @@
 
       const currentSoru = soru;
       const currentImg = base64Image;
+      const oAnkiSesModu = sesliCevapVer; // İstek gitmeden önceki modu hafızaya al
 
       soruInput.value = "";
       base64Image = null;
       previewContainer.style.display = "none";
       hiddenFileInput.value = "";
+      sesliCevapVer = false; // Bir sonraki mesaj için modu varsayılana çek (sessiz)
 
       const loadingMessage = document.createElement("div");
       loadingMessage.className = "message ai-message";
@@ -219,8 +233,8 @@
           if(response.ok) {
               loadingMessage.innerText = data.text;
               
-              // Eğer mikrofondan gelindiyse seslendir, klavyeyle yazıldıysa sessiz kal
-              if (sesliCevapVer) {
+              // Eğer süreç mikrofondan başladıysa seslendir, klavyeyle yazıldıysa sessiz kal
+              if (oAnkiSesModu === true) {
                   seslendir(data.text);
               }
           } else {
@@ -230,12 +244,10 @@
           loadingMessage.innerText = "Bağlantı hatası oluştu.";
       }
       
-      // Her istek bittiğinde ses modunu klavye (sessiz) moduna geri sıfırla
-      sesliCevapVer = false;
       chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  // Gönder butonu veya Enter tuşuna basıldığında sesliCevapVer'i false yapıyoruz (Sessiz mod)
+  // Manuel buton veya Enter basımlarında modu kesinlikle SESSİZ yapıyoruz
   gonderButon.addEventListener("click", () => {
       sesliCevapVer = false;
       mesajGonder();
