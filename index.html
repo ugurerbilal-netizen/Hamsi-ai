@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hamsi AI - Gelişmiş Asistan</title>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { background-color: #0b111e; color: #e3e3e3; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -17,14 +18,12 @@
         .user-message { background-color: #1e2d4a; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; border: 1px solid #2b3f66; }
         .ai-message { background-color: #162238; color: #e3e3e3; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #233554; }
         
-        /* 3 Nokta Yanıp Sönme Animasyonu */
         .typing-dots { display: flex; gap: 5px; align-items: center; height: 20px; }
         .typing-dots span { width: 8px; height: 8px; background-color: #4bacf7; border-radius: 50%; animation: blink 1.4s infinite both; }
         .typing-dots span:nth-child(2) { animation-delay: .2s; }
         .typing-dots span:nth-child(3) { animation-delay: .4s; }
         @keyframes blink { 0% { opacity: .2; } 20% { opacity: 1; } 100% { opacity: .2; } }
 
-        /* Önizleme Resmi Alanı */
         .preview-container { display: none; width: 100%; padding: 10px 20px; background: #162238; border-top: 1px solid #1e2d4a; align-items: center; gap: 10px; }
         .preview-image { max-height: 60px; border-radius: 8px; border: 1px solid #4bacf7; }
         .remove-btn { background: #ff4a4a !important; color: white !important; padding: 5px 10px !important; font-size: 0.8rem; border-radius: 4px; }
@@ -36,7 +35,6 @@
         input[type="text"] { width: 100%; padding: 14px 50px 14px 20px; background-color: #0b111e; border: 1px solid #233554; border-radius: 28px; color: #fff; font-size: 1rem; outline: none; }
         input[type="text"]:focus { border-color: #4bacf7; }
 
-        /* Yuvarlak İkon Butonları */
         .icon-btn { position: absolute; background: none; border: none; padding: 0; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 50%; transition: background 0.2s; }
         .icon-btn:hover { background-color: #1e2d4a; }
         #micButon { right: 10px; color: #4bacf7; }
@@ -47,8 +45,11 @@
         #gonderButon { background-color: #4bacf7; color: #0b111e; border: none; padding: 0 24px; border-radius: 28px; font-weight: 600; cursor: pointer; }
         #gonderButon:hover { background-color: #7cd3ff; }
         
+        /* ReCAPTCHA Alanı */
+        .captcha-wrapper { margin-top: 10px; display: flex; justify-content: center; width: 100%; }
+
         .uploaded-img { max-width: 200px; border-radius: 8px; margin-top: 8px; display: block; }
-        .disclaimer { font-size: 0.75rem; color: #627597; text-align: center; }
+        .disclaimer { font-size: 0.75rem; color: #627597; text-align: center; margin-top: 5px; }
         .chat-messages::-webkit-scrollbar { width: 6px; }
         .chat-messages::-webkit-scrollbar-thumb { background-color: #1e2d4a; border-radius: 4px; }
     </style>
@@ -81,6 +82,11 @@
             </div>
             <button id="gonderButon">Gönder</button>
         </div>
+
+        <div class="captcha-wrapper">
+            <div class="g-recaptcha" data-theme="dark" data-sitekey="BURAYA_GOOGLE_SITE_KEY_YAZILACAK"></div>
+        </div>
+
         <div class="disclaimer">Hamsi AI hata yapabilir. Görselleri ve sesleri işleyebilir.</div>
     </div>
 </div>
@@ -99,7 +105,7 @@
   let base64Image = null;
   let sesliCevapVer = false; 
 
-  // --- MİKROFON AYARLARI VE OTOMATİK GÖNDERME ---
+  // --- MİKROFON VE OTO GÖNDERME ---
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -111,7 +117,7 @@
               recognition.stop();
           } else {
               if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
-              sesliCevapVer = true; // Mikrofon açıldığı için sesli cevap modu aktif
+              sesliCevapVer = true; 
               recognition.start();
           }
       });
@@ -122,22 +128,17 @@
       recognition.onresult = (e) => {
           const spokenText = e.results[0][0].transcript;
           soruInput.value = spokenText;
-          
-          // Mikrofonun tamamen kapanması ve tarayıcının rahatlaması için 400ms güvenli bir gecikmeyle gönderiyoruz
-          setTimeout(() => {
-              mesajGonder();
-          }, 400);
+          setTimeout(() => { mesajGonder(); }, 400);
       };
   } else {
       micButon.style.display = "none";
   }
 
-  // --- RESİM YÜKLEME İŞLEMLERİ ---
+  // --- RESİM YÜKLEME ---
   fileButon.addEventListener("click", () => hiddenFileInput.click());
   hiddenFileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = function(event) {
           base64Image = event.target.result;
@@ -153,47 +154,38 @@
       previewContainer.style.display = "none";
   });
 
-  // --- ARKA PLANDA SES LİSTESİNİ DOLDURMA (GÜVENLİK ÖNLEMİ) ---
+  // --- SES LİSTESİ ---
   let sistemSesleri = [];
   function sesleriYukle() {
-      if ('speechSynthesis' in window) {
-          sistemSesleri = window.speechSynthesis.getVoices();
-      }
+      if ('speechSynthesis' in window) sistemSesleri = window.speechSynthesis.getVoices();
   }
   sesleriYukle();
-  if ('speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = sesleriYukle;
-  }
+  if ('speechSynthesis' in window) window.speechSynthesis.onvoiceschanged = sesleriYukle;
 
-  // --- GELİŞTİRİLMİŞ SESLİ OKUMA FONKSİYONU ---
   function seslendir(metin) {
       if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel(); 
-          
           const utterance = new SpeechSynthesisUtterance(metin);
           utterance.lang = 'tr-TR';
-          
-          // Robotik sesi kırmak için hız ve ton optimizasyonu
           utterance.rate = 0.95;  
           utterance.pitch = 1.05; 
-          
-          // Önbelleğe aldığımız ses listesinden en iyi Türkçe paketi buluyoruz
           const enIyiSes = sistemSesleri.find(s => s.lang.includes('tr') && (s.name.includes('Google') || s.name.includes('Microsoft') || s.name.includes('Natural')));
-          
-          if (enIyiSes) {
-              utterance.voice = enIyiSes;
-          } else {
-              utterance.voice = sistemSesleri.find(s => s.lang.includes('tr'));
-          }
-          
+          utterance.voice = enIyiSes ? enIyiSes : sistemSesleri.find(s => s.lang.includes('tr'));
           window.speechSynthesis.speak(utterance);
       }
   }
 
-  // --- MESAJ GÖNDERME VE AKILLI SES KONTROLÜ ---
+  // --- MESAJ GÖNDERME (RECAPTCHA TOKENLI) ---
   async function mesajGonder() {
       const soru = soruInput.value.trim();
       if (!soru && !base64Image) return;
+
+      // Google reCAPTCHA doğrulama kodunu alıyoruz
+      const captchaToken = grecaptcha.getResponse();
+      if (!captchaToken) {
+          alert("Lütfen önce robot doğrulamasını (reCAPTCHA) kutucuğuna tıklayarak tamamlayın!");
+          return;
+      }
 
       if ('speechSynthesis' in window) window.speechSynthesis.cancel(); 
 
@@ -207,13 +199,13 @@
 
       const currentSoru = soru;
       const currentImg = base64Image;
-      const oAnkiSesModu = sesliCevapVer; // İstek gitmeden önceki modu hafızaya al
+      const oAnkiSesModu = sesliCevapVer; 
 
       soruInput.value = "";
       base64Image = null;
       previewContainer.style.display = "none";
       hiddenFileInput.value = "";
-      sesliCevapVer = false; // Bir sonraki mesaj için modu varsayılana çek (sessiz)
+      sesliCevapVer = false; 
 
       const loadingMessage = document.createElement("div");
       loadingMessage.className = "message ai-message";
@@ -225,40 +217,32 @@
           const response = await fetch('/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message: currentSoru, image: currentImg })
+              // Gelişmişlik: Tokenı backend'e gönderiyoruz
+              body: JSON.stringify({ message: currentSoru, image: currentImg, captchaToken: captchaToken })
           });
           
           const data = await response.json();
           
           if(response.ok) {
               loadingMessage.innerText = data.text;
+              if (oAnkiSesModu === true) seslendir(data.text);
               
-              // Eğer süreç mikrofondan başladıysa seslendir, klavyeyle yazıldıysa sessiz kal
-              if (oAnkiSesModu === true) {
-                  seslendir(data.text);
-              }
+              // Her başarılı mesajdan sonra reCAPTCHA'yı sıfırla (Güvenlik için her mesajda yeni tik gerekir)
+              grecaptcha.reset();
           } else {
               loadingMessage.innerText = "Hata: " + data.error;
+              grecaptcha.reset();
           }
       } catch (error) {
           loadingMessage.innerText = "Bağlantı hatası oluştu.";
+          grecaptcha.reset();
       }
       
       chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  // Manuel buton veya Enter basımlarında modu kesinlikle SESSİZ yapıyoruz
-  gonderButon.addEventListener("click", () => {
-      sesliCevapVer = false;
-      mesajGonder();
-  });
-  
-  soruInput.addEventListener("keypress", (e) => { 
-      if (e.key === "Enter") { 
-          sesliCevapVer = false;
-          mesajGonder(); 
-      } 
-  });
+  gonderButon.addEventListener("click", () => { sesliCevapVer = false; mesajGonder(); });
+  soruInput.addEventListener("keypress", (e) => { if (e.key === "Enter") { sesliCevapVer = false; mesajGonder(); } });
 
   function ekranaMesajEkle(metin, sınıfAdı) {
       const mesajDiv = document.createElement("div");
