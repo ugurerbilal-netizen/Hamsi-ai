@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hamsi AI - Giriş Kapısı</title>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: #0b111e; color: #e3e3e3; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .login-container { background-color: #121b2d; padding: 40px; border-radius: 16px; border: 1px solid #1e2d4a; text-align: center; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); max-width: 400px; width: 90%; }
+        h1 { color: #4bacf7; margin-bottom: 10px; font-size: 1.8rem; }
+        p { color: #627597; margin-bottom: 25px; font-size: 0.95rem; }
+        .captcha-box { display: flex; justify-content: center; margin-bottom: 20px; }
+        #girisButon { background-color: #4bacf7; color: #0b111e; border: none; padding: 12px 30px; border-radius: 25px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: 0.2s; width: 100%; display: none; }
+        #girisButon:hover { background-color: #7cd3ff; }
+        .error-msg { color: #ff4a4a; font-size: 0.9rem; margin-top: 15px; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="login-container">
+    <h1>Hamsi AI Asistan 🐟</h1>
+    <p>Devam etmek için lütfen insan olduğunuzu doğrulayın.</p>
+    
+    <div class="captcha-box">
+        <div class="g-recaptcha" data-theme="dark" data-callback="recaptchaBasarili" data-sitekey="6LfKzQItAAAAAAI9baq5tU3MHymhJgylS7vqSR82"></div>
+    </div>
+
+    <button id="girisButon">Sohbete Başla →</button>
+    <div class="error-msg" id="errorMsg"></div>
+</div>
+
+<script>
+    const girisButon = document.getElementById("girisButon");
+    const errorMsg = document.getElementById("errorMsg");
+
+    // Kullanıcı reCAPTCHA kutusunu işaretlediğinde buton görünür
+    function recaptchaBasarili() {
+        girisButon.style.display = "block";
+    }
+
+    girisButon.addEventListener("click", async () => {
+        const token = grecaptcha.getResponse();
+        if(!token) return;
+
+        errorMsg.style.display = "none";
+        girisButon.innerText = "Doğrulanıyor...";
+
+        try {
+            // Arka plandaki Vercel API'sine doğrulama isteği gönderiyoruz
+            const response = await fetch('/api/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ captchaToken: token })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                // Tarayıcı hafızasına güvenli giriş anahtarı bırakıp sohbet sayfasına yönlendiriyoruz
+                localStorage.setItem("hamsi_verified", "true");
+                window.location.href = "/chat.html";
+            } else {
+                errorMsg.innerText = data.error || "Doğrulama başarısız.";
+                errorMsg.style.display = "block";
+                girisButon.innerText = "Sohbete Başla →";
+                grecaptcha.reset();
+                girisButon.style.display = "none";
+            }
+        } catch (error) {
+            errorMsg.innerText = "Sistem hatası oluştu.";
+            errorMsg.style.display = "block";
+            girisButon.innerText = "Sohbete Başla →";
+        }
+    });
+</script>
+
+</body>
+</html>
