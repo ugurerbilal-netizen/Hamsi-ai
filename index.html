@@ -98,7 +98,7 @@
 
   let base64Image = null;
 
-  // --- MİKROFON (SESİ YAZIYA ÇEVİRME) ---
+  // --- MİKROFON (SESI YAZIYA ÇEVİRME) ---
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -109,6 +109,10 @@
           if (micButon.classList.contains("recording")) {
               recognition.stop();
           } else {
+              // Yeni bir şey dinlemeden önce asistanın eski konuşması varsa susturuyoruz
+              if ('speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+              }
               recognition.start();
           }
       });
@@ -118,9 +122,11 @@
       recognition.onresult = (e) => {
           const spokenText = e.results[0][0].transcript;
           soruInput.value = spokenText;
+          // İsteğe bağlı: Mikrofondan ses geldikten sonra otomatik göndermek istersen alt satırı aktifleştirebilirsin:
+          // mesajGonder();
       };
   } else {
-      micButon.style.display = "none"; // Tarayıcı desteklemiyorsa gizle
+      micButon.style.display = "none";
   }
 
   // --- RESİM YÜKLEME İŞLEMLERİ ---
@@ -131,7 +137,7 @@
 
       const reader = new FileReader();
       reader.onload = function(event) {
-          base64Image = event.target.result; // Vercel'e göndermek için base64'e çevirdik
+          base64Image = event.target.result;
           previewImage.src = base64Image;
           previewContainer.style.display = "flex";
       };
@@ -144,10 +150,31 @@
       previewContainer.style.display = "none";
   });
 
+  // --- SESLİ OKUMA (TEXT TO SPEECH) FONKSİYONU ---
+  function seslendir(metin) {
+      if ('speechSynthesis' in window) {
+          // Devam eden eski bir okuma varsa kes
+          window.speechSynthesis.cancel();
+          
+          const utterance = new SpeechSynthesisUtterance(metin);
+          utterance.lang = 'tr-TR'; // Türkçe seslendirme
+          utterance.rate = 1.0;     // Normal konuşma hızı
+          
+          window.speechSynthesis.speak(utterance);
+      } else {
+          console.error("Tarayıcınız sesli okumayı (TTS) desteklemiyor.");
+      }
+  }
+
   // --- MESAJ GÖNDERME VE YANIP SÖNEN ÜÇ NOKTA ---
   async function mesajGonder() {
       const soru = soruInput.value.trim();
       if (!soru && !base64Image) return;
+
+      // Kullanıcı yeni mesaj attığında eğer asistan o sırada konuşuyorsa sustur
+      if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+      }
 
       // Kullanıcının mesajını ekrana bas (Varsa resmi de ekle)
       let userDiv = ekranaMesajEkle(soru, "user-message");
@@ -185,6 +212,7 @@
           
           if(response.ok) {
               loadingMessage.innerText = data.text;
+              seslendir(data.text); // Yapay zekadan gelen yanıtı seslendiriyoruz!
           } else {
               loadingMessage.innerText = "Hata: " + data.error;
           }
